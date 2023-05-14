@@ -7,14 +7,39 @@ import * as argon from 'argon2';
 export class AuthService {
   constructor(private prisma: PrismaService) {}
 
-  signIn() {
-    const getAllUsers = this.prisma.user.findMany();
+  async signIn(body: AuthDto) {
+    // get the user from the database by email
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: body.email,
+      },
+    });
 
-    return getAllUsers;
+    // if the user doesn't exist, throw an error
+    if (!user) {
+      throw new ForbiddenException('Credentials are invalid');
+    }
+
+    // compare the password with the hash
+    const isPasswordValid = await argon.verify(user.hash, body.password, {
+      secret: Buffer.from(process.env.ARGON_SECRET),
+    });
+
+    // if the password doesn't match, throw an error
+    if (!isPasswordValid) {
+      throw new ForbiddenException('Credentials are invalid');
+    }
+
+    // if the password matches, return the user
+    delete user.hash;
+
+    return user;
   }
 
   async signUp(body: AuthDto) {
-    const hash = await argon.hash(body.password);
+    const hash = await argon.hash(body.password, {
+      secret: Buffer.from(process.env.ARGON_SECRET),
+    });
 
     try {
       const createUser = await this.prisma.user.create({
