@@ -40,6 +40,7 @@ export class AuthService {
   }
 
   async signUp(body: AuthDto) {
+    // hash the password with argon2 and a secret (pepper)
     const hash = await argon.hash(body.password, {
       secret: Buffer.from(process.env.ARGON_SECRET),
     });
@@ -63,14 +64,23 @@ export class AuthService {
     }
   }
 
-  async signToken(userId: string, email: string): Promise<string> {
+  async signToken(
+    userId: string,
+    email: string,
+  ): Promise<{
+    access_token: string;
+  }> {
     const payload = { sub: userId, email };
 
     const secret = this.config.get('JWT_SECRET');
 
-    return this.jwt.signAsync(payload, {
+    const token = await this.jwt.signAsync(payload, {
       expiresIn: '15m',
       secret,
     });
+
+    return {
+      access_token: token,
+    };
   }
 }
